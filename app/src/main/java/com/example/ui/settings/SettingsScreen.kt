@@ -1064,23 +1064,42 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 }
 
                 if (updateDownloadUrl != null && updateDownloadUrl!!.isNotBlank()) {
-                    Button(
-                        onClick = {
-                            viewModel.downloadAndInstallUpdate(context, updateDownloadUrl!!)
-                        },
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = themeColors.paid,
-                            contentColor = themeColors.onPaid
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(48.dp)
-                            .testTag("download_latest_apk_button")
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = "Download APK", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Download & Install Latest APK", fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = {
+                                viewModel.downloadAndInstallUpdate(context, updateDownloadUrl!!)
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = themeColors.paid,
+                                contentColor = themeColors.onPaid
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("download_latest_apk_button")
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = "Download APK", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Download & Install Latest APK", fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                viewModel.installDownloadedApk(context)
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("install_downloaded_apk_button")
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = "Install APK", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Install Downloaded APK", fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }

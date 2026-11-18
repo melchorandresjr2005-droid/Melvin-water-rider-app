@@ -13,8 +13,10 @@ android {
     applicationId = "com.aistudio.waterrider.kdpxmw"
     minSdk = 24
     targetSdk = 36
-    versionCode = 1
-    versionName = "1.0"
+    val runNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+    val versionNameEnv = System.getenv("GITHUB_REF_NAME")?.removePrefix("v") ?: "1.0.$runNumber"
+    versionCode = runNumber
+    versionName = versionNameEnv
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

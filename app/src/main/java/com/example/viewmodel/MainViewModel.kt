@@ -3,9 +3,12 @@ package com.example.viewmodel
 import android.app.Application
 import android.app.DownloadManager
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Environment
+import android.provider.Settings
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import com.example.BuildConfig
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
@@ -695,6 +698,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                         val body = response.body?.string() ?: ""
                         val json = JSONObject(body)
                         val tagName = json.optString("tag_name", "v1.0")
+                        val cleanTag = tagName.removePrefix("v").trim()
+                        val currentVersion = BuildConfig.VERSION_NAME.trim()
+
                         val assets = json.optJSONArray("assets")
                         var downloadUrl = ""
                         if (assets != null && assets.length() > 0) {
@@ -710,13 +716,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                                 downloadUrl = assets.getJSONObject(0).optString("browser_download_url", "")
                             }
                         }
-                        _updateDownloadUrl.value = downloadUrl
-                        _updateStatus.value = "Latest release: $tagName (Current: ${BuildConfig.VERSION_NAME})"
+
+                        if (downloadUrl.isEmpty()) {
+                            _updateDownloadUrl.value = null
+                            _updateStatus.value = "Release $tagName found, but no .apk asset attached in release assets."
+                        } else {
+                            _updateDownloadUrl.value = downloadUrl
+                            if (cleanTag != currentVersion) {
+                                _updateStatus.value = "New release $tagName available! (Current: $currentVersion)"
+                            } else {
+                                _updateStatus.value = "Latest release: $tagName (You are on current version $currentVersion)"
+                            }
+                        }
                     } catch (e: Exception) {
-                        _updateStatus.value = "Error parsing release info."
+                        _updateStatus.value = "Error parsing release info: ${e.localizedMessage}"
                     }
                 } else {
-                    _updateStatus.value = "No published releases found yet."
+                    _updateStatus.value = "No published GitHub releases found yet (HTTP ${response.code})."
                 }
             }
         })
@@ -724,6 +740,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
         try {
+            val appContext = context.applicationContext
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                val pm = appContext.packageManager
+                if (!pm.canRequestPackageInstalls()) {
+                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${appContext.packageName}"))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    appContext.startActivity(intent)
+                    Toast.makeText(appContext, "Please allow 'Install unknown apps' permission to update.", Toast.LENGTH_LONG).show()
+                    _updateStatus.value = "Grant 'Install unknown apps' permission in Settings."
+                    return
+                }
+            }
+
             val request = DownloadManager.Request(Uri.parse(downloadUrl))
                 .setTitle("MelvinWaterRider Update")
                 .setDescription("Downloading latest APK...")
@@ -731,13 +760,43 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "MelvinWaterRider_latest.apk")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
-            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+
+            val file = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MelvinWaterRider_latest.apk")
+            if (file.exists()) file.delete()
+
             dm.enqueue(request)
-            _updateStatus.value = "Downloading update to Downloads..."
-            Toast.makeText(context, "Downloading update to Downloads folder...", Toast.LENGTH_LONG).show()
+            _updateStatus.value = "Downloading update to Downloads folder..."
+            Toast.makeText(appContext, "Downloading update...", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             _updateStatus.value = "Download failed: ${e.localizedMessage}"
             Toast.makeText(context, "Download failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun installDownloadedApk(context: Context) {
+        try {
+            val file = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MelvinWaterRider_latest.apk")
+            if (!file.exists()) {
+                Toast.makeText(context, "Downloaded APK not found in Downloads folder.", Toast.LENGTH_SHORT).show()
+                _updateStatus.value = "Downloaded APK file not found."
+                return
+            }
+            val apkUri = FileProvider.getUriForFile(
+                context,
+                "${context.packageName}.fileprovider",
+                file
+            )
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(apkUri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            _updateStatus.value = "Launching package installer..."
+        } catch (e: Exception) {
+            _updateStatus.value = "Install failed: ${e.localizedMessage}"
+            Toast.makeText(context, "Install failed: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
         }
     }
 }
