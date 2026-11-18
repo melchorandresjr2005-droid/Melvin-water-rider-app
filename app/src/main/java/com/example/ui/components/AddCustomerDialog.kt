@@ -83,7 +83,7 @@ fun AddCustomerDialog(
                 Text("Customer Type:", fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     FilterChip(
                         selected = customerType == "Residential",
@@ -95,8 +95,8 @@ fun AddCustomerDialog(
                                 alkalinePrice = defaultAlkalinePrice.toString()
                             }
                         },
-                        label = { Text("Residential", fontSize = 12.sp) },
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        label = { Text("Residential", fontSize = 11.sp, maxLines = 1, softWrap = false) },
+                        modifier = Modifier.weight(1f).height(44.dp)
                     )
                     FilterChip(
                         selected = customerType == "Outlet",
@@ -108,8 +108,8 @@ fun AddCustomerDialog(
                                 alkalinePrice = "35.0"
                             }
                         },
-                        label = { Text("Outlet", fontSize = 12.sp) },
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        label = { Text("Outlet", fontSize = 11.sp, maxLines = 1, softWrap = false) },
+                        modifier = Modifier.weight(0.85f).height(44.dp)
                     )
                     FilterChip(
                         selected = customerType == "Bank / Direct",
@@ -121,8 +121,8 @@ fun AddCustomerDialog(
                                 alkalinePrice = defaultAlkalinePrice.toString()
                             }
                         },
-                        label = { Text("Bank / Direct", fontSize = 12.sp) },
-                        modifier = Modifier.weight(1.1f).height(48.dp)
+                        label = { Text("Bank / Direct", fontSize = 10.5.sp, maxLines = 1, softWrap = false) },
+                        modifier = Modifier.weight(1.15f).height(44.dp)
                     )
                 }
 
@@ -181,7 +181,8 @@ fun AddCustomerDialog(
                     purifiedTiers.forEach { tier ->
                         AssistChip(
                             onClick = { purifiedPrice = "$tier.0" },
-                            label = { Text("Purified ₱$tier") }
+                            label = { Text("Pur ₱$tier", fontSize = 11.sp, maxLines = 1, softWrap = false) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
@@ -193,7 +194,8 @@ fun AddCustomerDialog(
                     alkalineTiers.forEach { tier ->
                         AssistChip(
                             onClick = { alkalinePrice = "$tier.0" },
-                            label = { Text("Alkaline ₱$tier") }
+                            label = { Text("Alk ₱$tier", fontSize = 11.sp, maxLines = 1, softWrap = false) },
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }
