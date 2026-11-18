@@ -1,8 +1,12 @@
 package com.example.viewmodel
 
 import android.app.Application
+import android.app.DownloadManager
 import android.content.Context
 import android.net.Uri
+import android.os.Environment
+import android.widget.Toast
+import com.example.BuildConfig
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -677,7 +681,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _updateStatus.value = "Checking for updates..."
         val client = OkHttpClient()
         val request = Request.Builder()
-            .url("https://api.github.com/repos/melchorandresjr2005/MelvinWaterRider/releases/latest")
+            .url("https://api.github.com/repos/melchorandresp2005-droid/Melvin-water-rider-app/releases/latest")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -707,7 +711,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             }
                         }
                         _updateDownloadUrl.value = downloadUrl
-                        _updateStatus.value = "Latest release: $tagName"
+                        _updateStatus.value = "Latest release: $tagName (Current: ${BuildConfig.VERSION_NAME})"
                     } catch (e: Exception) {
                         _updateStatus.value = "Error parsing release info."
                     }
@@ -716,5 +720,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         })
+    }
+
+    fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
+        try {
+            val request = DownloadManager.Request(Uri.parse(downloadUrl))
+                .setTitle("MelvinWaterRider Update")
+                .setDescription("Downloading latest APK...")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "MelvinWaterRider_latest.apk")
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+            val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            dm.enqueue(request)
+            _updateStatus.value = "Downloading update to Downloads..."
+            Toast.makeText(context, "Downloading update to Downloads folder...", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            _updateStatus.value = "Download failed: ${e.localizedMessage}"
+            Toast.makeText(context, "Download failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        }
     }
 }

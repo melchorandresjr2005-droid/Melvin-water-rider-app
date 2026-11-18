@@ -1066,17 +1066,21 @@ fun SettingsScreen(viewModel: MainViewModel) {
                 if (updateDownloadUrl != null && updateDownloadUrl!!.isNotBlank()) {
                     Button(
                         onClick = {
-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(updateDownloadUrl))
-                            context.startActivity(intent)
+                            viewModel.downloadAndInstallUpdate(context, updateDownloadUrl!!)
                         },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = themeColors.paid,
                             contentColor = themeColors.onPaid
                         ),
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth().height(48.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("download_latest_apk_button")
                     ) {
-                        Text("Download Latest APK", fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.CloudDownload, contentDescription = "Download APK", modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text("Download & Install Latest APK", fontWeight = FontWeight.Bold)
                     }
                 }
             }
