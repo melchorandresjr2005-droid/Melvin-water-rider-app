@@ -2,17 +2,21 @@ package com.example.viewmodel
 
 import android.app.Application
 import android.app.DownloadManager
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
-import com.example.BuildConfig
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.BuildConfig
 import com.example.data.AdvanceRemitEntity
 import com.example.data.AppDatabase
 import com.example.data.AppRepository
@@ -30,6 +34,8 @@ import com.example.data.ThemePreferences
 import com.example.data.ValeLogEntity
 import com.example.data.WeeklyPayoutEntity
 import com.example.ui.theme.AppThemeId
+import java.io.File
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -48,7 +54,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
-import java.io.IOException
 
 enum class CustomerFilter {
     ALL, WITH_UTANG, WITH_SUKLI, NOT_DELIVERED_TODAY
@@ -685,6 +690,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val client = OkHttpClient()
         val request = Request.Builder()
             .url("https://api.github.com/repos/melchorandresp2005-droid/Melvin-water-rider-app/releases/latest")
+            .header("Accept", "application/vnd.github+json")
+            .header("User-Agent", "MelvinWaterRider-Android")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -693,46 +700,48 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                if (response.isSuccessful) {
-                    try {
-                        val body = response.body?.string() ?: ""
-                        val json = JSONObject(body)
-                        val tagName = json.optString("tag_name", "v1.0")
-                        val cleanTag = tagName.removePrefix("v").trim()
-                        val currentVersion = BuildConfig.VERSION_NAME.trim()
+                response.use { res ->
+                    if (res.isSuccessful) {
+                        try {
+                            val body = res.body?.string() ?: ""
+                            val json = JSONObject(body)
+                            val tagName = json.optString("tag_name", "v1.0")
+                            val cleanTag = tagName.removePrefix("v").trim()
+                            val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").trim()
 
-                        val assets = json.optJSONArray("assets")
-                        var downloadUrl = ""
-                        if (assets != null && assets.length() > 0) {
-                            for (i in 0 until assets.length()) {
-                                val asset = assets.getJSONObject(i)
-                                val url = asset.optString("browser_download_url", "")
-                                if (url.endsWith(".apk", ignoreCase = true)) {
-                                    downloadUrl = url
-                                    break
+                            val assets = json.optJSONArray("assets")
+                            var downloadUrl = ""
+                            if (assets != null && assets.length() > 0) {
+                                for (i in 0 until assets.length()) {
+                                    val asset = assets.getJSONObject(i)
+                                    val url = asset.optString("browser_download_url", "")
+                                    if (url.endsWith(".apk", ignoreCase = true)) {
+                                        downloadUrl = url
+                                        break
+                                    }
+                                }
+                                if (downloadUrl.isEmpty()) {
+                                    downloadUrl = assets.getJSONObject(0).optString("browser_download_url", "")
                                 }
                             }
-                            if (downloadUrl.isEmpty()) {
-                                downloadUrl = assets.getJSONObject(0).optString("browser_download_url", "")
-                            }
-                        }
 
-                        if (downloadUrl.isEmpty()) {
-                            _updateDownloadUrl.value = null
-                            _updateStatus.value = "Release $tagName found, but no .apk asset attached in release assets."
-                        } else {
-                            _updateDownloadUrl.value = downloadUrl
-                            if (cleanTag != currentVersion) {
-                                _updateStatus.value = "New release $tagName available! (Current: $currentVersion)"
+                            if (downloadUrl.isEmpty()) {
+                                _updateDownloadUrl.value = null
+                                _updateStatus.value = "Release $tagName found, but no .apk asset attached."
                             } else {
-                                _updateStatus.value = "Latest release: $tagName (You are on current version $currentVersion)"
+                                _updateDownloadUrl.value = downloadUrl
+                                if (cleanTag != currentVersion) {
+                                    _updateStatus.value = "New release $tagName available! (Current: v$currentVersion)"
+                                } else {
+                                    _updateStatus.value = "Latest release: $tagName (You are on current version v$currentVersion)"
+                                }
                             }
+                        } catch (e: Exception) {
+                            _updateStatus.value = "Error parsing release info: ${e.localizedMessage}"
                         }
-                    } catch (e: Exception) {
-                        _updateStatus.value = "Error parsing release info: ${e.localizedMessage}"
+                    } else {
+                        _updateStatus.value = "No published GitHub releases found yet (HTTP ${res.code})."
                     }
-                } else {
-                    _updateStatus.value = "No published GitHub releases found yet (HTTP ${response.code})."
                 }
             }
         })
@@ -741,33 +750,69 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
         try {
             val appContext = context.applicationContext
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val pm = appContext.packageManager
                 if (!pm.canRequestPackageInstalls()) {
-                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${appContext.packageName}"))
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${appContext.packageName}")
+                    ).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                     appContext.startActivity(intent)
-                    Toast.makeText(appContext, "Please allow 'Install unknown apps' permission to update.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        appContext,
+                        "I-allow muna ang 'Install unknown apps' para sa Melvin WaterRider.",
+                        Toast.LENGTH_LONG
+                    ).show()
                     _updateStatus.value = "Grant 'Install unknown apps' permission in Settings."
                     return
                 }
+            }
+
+            val downloadDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            if (downloadDir != null && !downloadDir.exists()) {
+                downloadDir.mkdirs()
+            }
+            val file = File(downloadDir, "MelvinWaterRider_latest.apk")
+            if (file.exists()) {
+                file.delete()
             }
 
             val request = DownloadManager.Request(Uri.parse(downloadUrl))
                 .setTitle("MelvinWaterRider Update")
                 .setDescription("Downloading latest APK...")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "MelvinWaterRider_latest.apk")
+                .setDestinationInExternalFilesDir(appContext, Environment.DIRECTORY_DOWNLOADS, "MelvinWaterRider_latest.apk")
+                .setMimeType("application/vnd.android.package-archive")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
+
             val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            val downloadId = dm.enqueue(request)
 
-            val file = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MelvinWaterRider_latest.apk")
-            if (file.exists()) file.delete()
+            _updateStatus.value = "Downloading update..."
+            Toast.makeText(appContext, "Downloading update...", Toast.LENGTH_SHORT).show()
 
-            dm.enqueue(request)
-            _updateStatus.value = "Downloading update to Downloads folder..."
-            Toast.makeText(appContext, "Downloading update...", Toast.LENGTH_LONG).show()
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context, intent: Intent) {
+                    val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                    if (id == downloadId) {
+                        try {
+                            appContext.unregisterReceiver(this)
+                        } catch (_: Exception) {
+                        }
+                        installDownloadedApk(appContext)
+                    }
+                }
+            }
+
+            ContextCompat.registerReceiver(
+                appContext,
+                receiver,
+                IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
+                ContextCompat.RECEIVER_EXPORTED
+            )
         } catch (e: Exception) {
             _updateStatus.value = "Download failed: ${e.localizedMessage}"
             Toast.makeText(context, "Download failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
@@ -776,15 +821,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun installDownloadedApk(context: Context) {
         try {
-            val file = java.io.File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "MelvinWaterRider_latest.apk")
-            if (!file.exists()) {
-                Toast.makeText(context, "Downloaded APK not found in Downloads folder.", Toast.LENGTH_SHORT).show()
+            val appContext = context.applicationContext
+            val file = File(
+                appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
+                "MelvinWaterRider_latest.apk"
+            )
+            if (!file.exists() || file.length() == 0L) {
+                Toast.makeText(appContext, "Downloaded APK not found.", Toast.LENGTH_SHORT).show()
                 _updateStatus.value = "Downloaded APK file not found."
                 return
             }
             val apkUri = FileProvider.getUriForFile(
-                context,
-                "${context.packageName}.fileprovider",
+                appContext,
+                "${appContext.packageName}.fileprovider",
                 file
             )
             val intent = Intent(Intent.ACTION_VIEW).apply {
@@ -792,7 +841,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            context.startActivity(intent)
+            appContext.startActivity(intent)
             _updateStatus.value = "Launching package installer..."
         } catch (e: Exception) {
             _updateStatus.value = "Install failed: ${e.localizedMessage}"
