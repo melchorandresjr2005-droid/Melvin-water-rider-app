@@ -39,6 +39,8 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.components.AnimatedRollingAmount
@@ -938,26 +940,58 @@ fun SettingsScreen(viewModel: MainViewModel) {
                             contentColor = themeColors.onPrimaryAccent
                         ),
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
+                            .defaultMinSize(minHeight = 54.dp)
                             .testTag("select_backup_folder_button")
                     ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = "Select Backup Folder", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Select Backup Folder", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = "Select Backup Folder", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Select Backup Folder",
+                                fontSize = 11.5.sp,
+                                lineHeight = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Visible
+                            )
+                        }
                     }
                     OutlinedButton(
                         onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
                         shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
                         modifier = Modifier
                             .weight(1f)
-                            .height(48.dp)
+                            .defaultMinSize(minHeight = 54.dp)
                             .testTag("restore_auto_backup_button")
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = "Restore Backup", modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Restore Backup", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = "Restore Backup", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Restore Backup",
+                                fontSize = 11.5.sp,
+                                lineHeight = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Visible
+                            )
+                        }
                     }
                 }
             }
@@ -983,20 +1017,56 @@ fun SettingsScreen(viewModel: MainViewModel) {
                     Button(
                         onClick = { exportLauncher.launch("MelvinWaterRider_Backup_$todayStr.json") },
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .defaultMinSize(minHeight = 54.dp)
                     ) {
-                        Icon(Icons.Default.CloudUpload, contentDescription = "Export")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Backup JSON", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudUpload, contentDescription = "Export", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Backup JSON",
+                                fontSize = 11.5.sp,
+                                lineHeight = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Visible
+                            )
+                        }
                     }
                     OutlinedButton(
                         onClick = { importLauncher.launch(arrayOf("application/json", "*/*")) },
                         shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f).height(48.dp)
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp),
+                        modifier = Modifier
+                            .weight(1f)
+                            .defaultMinSize(minHeight = 54.dp)
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = "Import")
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Restore JSON", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.CloudDownload, contentDescription = "Import", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Restore JSON",
+                                fontSize = 11.5.sp,
+                                lineHeight = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                softWrap = true,
+                                overflow = TextOverflow.Visible
+                            )
+                        }
                     }
                 }
 
