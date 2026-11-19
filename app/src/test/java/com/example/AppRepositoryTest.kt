@@ -379,7 +379,7 @@ class AppRepositoryTest {
         assertTrue(report.contains("Bank / Direct (Diretso kay Boss): 5 gal — ₱225.00"))
         assertTrue(report.contains("• BDO Branch (5 Alkaline): ₱225.00"))
         assertTrue(report.contains("BAYAD UTANG (Dagdag sa Galon & Cash):"))
-        assertTrue(report.contains("• Nena (2 gal - FULLY PAID): +₱70.00"))
+        assertTrue(report.contains("+2 gal - Nena (Paid Pautang): +₱70.00"))
         assertTrue(report.contains("GASTOS SA ROTA:"))
         assertTrue(report.contains("• Gasolina: -₱30.00"))
         assertTrue(report.contains("ADVANCE REMIT:"))

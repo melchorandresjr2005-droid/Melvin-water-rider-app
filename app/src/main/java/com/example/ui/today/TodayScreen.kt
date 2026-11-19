@@ -830,7 +830,12 @@ internal fun buildRemitReport(
     allPayments: List<PaymentEntity> = emptyList(),
     allAdvanceRemits: List<AdvanceRemitEntity> = emptyList()
 ): String {
-    val dateLabel = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(log.timestamp))
+    val reportDate = Date(log.timestamp)
+    val tagalogDay = getTagalogDayName(reportDate)
+    val formattedDate = SimpleDateFormat("MMM d, yyyy", Locale.US).format(reportDate)
+    val dateHeader = "$tagalogDay — $formattedDate" // e.g. Huwebes — Nov 19, 2026
+
+    val dateLabel = SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(reportDate)
     val timeFormat = SimpleDateFormat("h:mm a", Locale.getDefault())
     val matchedDeliveries = if (log.id != 0L) allDeliveries.filter { it.remittanceId == log.id } else emptyList()
     val matchedPayments = if (log.id != 0L) allPayments.filter { it.remittanceId == log.id } else emptyList()
@@ -921,14 +926,13 @@ internal fun buildRemitReport(
             log.utangPaymentDetails.lines().filter { it.isNotBlank() }
         matchedPayments.isNotEmpty() ->
             matchedPayments.map { pay ->
-                val statusTag = if (pay.remainingBalance > 0.0) {
-                    String.format(Locale.US, "Hulog lang | Balanse: ₱%,.2f", pay.remainingBalance)
-                } else if (pay.commissionGallonsEarned > 0.0) {
-                    "${formatReportGallonCount(pay.commissionGallonsEarned)} gal - FULLY PAID"
+                if (pay.remainingBalance == 0.0 && pay.commissionGallonsEarned > 0.0) {
+                    String.format(Locale.US, "+%s gal - %s (Paid Pautang): +₱%,.2f", formatReportGallonCount(pay.commissionGallonsEarned), pay.customerName, pay.amount)
+                } else if (pay.remainingBalance > 0.0) {
+                    String.format(Locale.US, "• %s (Hulog lang | Balanse: ₱%,.2f): +₱%,.2f", pay.customerName, pay.remainingBalance, pay.amount)
                 } else {
-                    "FULLY PAID"
+                    String.format(Locale.US, "+%s gal - %s (Paid Pautang): +₱%,.2f", formatReportGallonCount(pay.commissionGallonsEarned), pay.customerName, pay.amount)
                 }
-                String.format(Locale.US, "• %s (%s): +₱%,.2f", pay.customerName, statusTag, pay.amount)
             }
         else -> emptyList()
     }
@@ -974,8 +978,10 @@ internal fun buildRemitReport(
     }
 
     return buildString {
+        appendLine(dateHeader)
         appendLine("Melvin WaterRider - Remit Report ($dateLabel)")
         appendLine()
+        appendLine("$totalCashPaidGallons gal = Delivered (Paid)")
         appendLine("GALON NA MAY BAYAD (Ngayong Araw): $totalCashPaidGallons gal ($cashPaidPurified Purified | $cashPaidAlkaline Alkaline)")
         appendLine(String.format(Locale.US, "Benta sa Cash Delivered: ₱%,.2f", cashDeliverySales))
         if (bankDirectGallons > 0 || bankDirectLines.isNotEmpty()) {
@@ -1011,8 +1017,23 @@ internal fun buildRemitReport(
         append(String.format(Locale.US, "(Kabuuang Remit Buong Araw: ₱%,.2f)", totalDayRemitted))
         if (log.notes.isNotBlank()) {
             appendLine()
+            appendLine()
             append("Mga Tala: ${log.notes}")
         }
+    }
+}
+
+private fun getTagalogDayName(date: Date): String {
+    val cal = Calendar.getInstance().apply { time = date }
+    return when (cal.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.MONDAY -> "Lunes"
+        Calendar.TUESDAY -> "Martes"
+        Calendar.WEDNESDAY -> "Miyerkules"
+        Calendar.THURSDAY -> "Huwebes"
+        Calendar.FRIDAY -> "Biyernes"
+        Calendar.SATURDAY -> "Sabado"
+        Calendar.SUNDAY -> "Linggo"
+        else -> "Lunes"
     }
 }
 
