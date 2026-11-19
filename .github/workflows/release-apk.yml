@@ -6,6 +6,9 @@ on:
     tags: [ "v*" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
@@ -32,6 +35,19 @@ jobs:
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
+
+      - name: Sync App Version with Build Number
+        run: |
+          NEW_CODE=${{ github.run_number }}
+          NEW_NAME="1.0.${{ github.run_number }}"
+          echo "Setting versionCode=$NEW_CODE and versionName=$NEW_NAME"
+          if [ -f app/build.gradle.kts ]; then
+            sed -i -E "s/versionCode\s*=\s*[0-9]+/versionCode = $NEW_CODE/" app/build.gradle.kts
+            sed -i -E "s/versionName\s*=\s*\"[^\"]+\"/versionName = \"$NEW_NAME\"/" app/build.gradle.kts
+          elif [ -f app/build.gradle ]; then
+            sed -i -E "s/versionCode\s+[0-9]+/versionCode $NEW_CODE/" app/build.gradle
+            sed -i -E "s/versionName\s+\"[^\"]+\"/versionName \"$NEW_NAME\"/" app/build.gradle
+          fi
 
       - name: Prepare Release Keystore
         env:
@@ -80,7 +96,7 @@ jobs:
         with:
           tag_name: v1.0.${{ github.run_number }}
           name: Release v1.0.${{ github.run_number }}
-          files: "**/*.apk"
+          files: build/outputs/apk/release-out/MelvinWaterRider-release.apk
           fail_on_unmatched_files: true
           generate_release_notes: true
         env:
