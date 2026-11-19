@@ -926,16 +926,35 @@ internal fun buildRemitReport(
             log.utangPaymentDetails.lines().filter { it.isNotBlank() }
         matchedPayments.isNotEmpty() ->
             matchedPayments.map { pay ->
-                if (pay.remainingBalance == 0.0 && pay.commissionGallonsEarned > 0.0) {
-                    String.format(Locale.US, "+%s gal - %s (Paid Pautang): +₱%,.2f", formatReportGallonCount(pay.commissionGallonsEarned), pay.customerName, pay.amount)
-                } else if (pay.remainingBalance > 0.0) {
-                    String.format(Locale.US, "• %s (Hulog lang | Balanse: ₱%,.2f): +₱%,.2f", pay.customerName, pay.remainingBalance, pay.amount)
+                val statusTag = if (pay.remainingBalance > 0.0) {
+                    String.format(Locale.US, "Hulog lang | Balanse: ₱%,.2f", pay.remainingBalance)
+                } else if (pay.commissionGallonsEarned > 0.0) {
+                    "${formatReportGallonCount(pay.commissionGallonsEarned)} gal - FULLY PAID"
                 } else {
-                    String.format(Locale.US, "+%s gal - %s (Paid Pautang): +₱%,.2f", formatReportGallonCount(pay.commissionGallonsEarned), pay.customerName, pay.amount)
+                    "FULLY PAID"
                 }
+                String.format(Locale.US, "• %s (%s): +₱%,.2f", pay.customerName, statusTag, pay.amount)
             }
         else -> emptyList()
     }
+
+    val paidPautangHeaderLines = if (matchedPayments.isNotEmpty()) {
+        matchedPayments
+            .filter { it.remainingBalance == 0.0 && it.commissionGallonsEarned > 0.0 }
+            .map { pay ->
+                String.format(Locale.US, "+%s gal - %s (Paid Pautang)", formatReportGallonCount(pay.commissionGallonsEarned), pay.customerName)
+            }
+    } else if (log.utangPaymentDetails.isNotBlank()) {
+        val fullyPaidRegex = Regex("""•\s*(.+?)\s*\(([\d.]+)\s*gal\s*-\s*FULLY PAID\):""")
+        log.utangPaymentDetails.lines().mapNotNull { line ->
+            val match = fullyPaidRegex.find(line)
+            if (match != null) {
+                val name = match.groupValues[1]
+                val gal = match.groupValues[2]
+                "+$gal gal - $name (Paid Pautang)"
+            } else null
+        }
+    } else emptyList()
 
     val expenseLines = when {
         log.expenseDetails.isNotBlank() ->
@@ -982,6 +1001,7 @@ internal fun buildRemitReport(
         appendLine("Melvin WaterRider - Remit Report ($dateLabel)")
         appendLine()
         appendLine("$totalCashPaidGallons gal = Delivered (Paid)")
+        paidPautangHeaderLines.forEach { appendLine(it) }
         appendLine("GALON NA MAY BAYAD (Ngayong Araw): $totalCashPaidGallons gal ($cashPaidPurified Purified | $cashPaidAlkaline Alkaline)")
         appendLine(String.format(Locale.US, "Benta sa Cash Delivered: ₱%,.2f", cashDeliverySales))
         if (bankDirectGallons > 0 || bankDirectLines.isNotEmpty()) {

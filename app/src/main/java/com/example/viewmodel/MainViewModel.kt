@@ -7,16 +7,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import com.example.BuildConfig
+import java.io.File
 import androidx.documentfile.provider.DocumentFile
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.BuildConfig
 import com.example.data.AdvanceRemitEntity
 import com.example.data.AppDatabase
 import com.example.data.AppRepository
@@ -34,8 +34,6 @@ import com.example.data.ThemePreferences
 import com.example.data.ValeLogEntity
 import com.example.data.WeeklyPayoutEntity
 import com.example.ui.theme.AppThemeId
-import java.io.File
-import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -54,6 +52,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
+import java.io.IOException
 
 enum class CustomerFilter {
     ALL, WITH_UTANG, WITH_SUKLI, NOT_DELIVERED_TODAY
@@ -690,8 +689,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         val client = OkHttpClient()
         val request = Request.Builder()
             .url("https://api.github.com/repos/melchorandresp2005-droid/Melvin-water-rider-app/releases/latest")
-            .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "MelvinWaterRider-Android")
+            .addHeader("Accept", "application/vnd.github+json")
+            .addHeader("User-Agent", "MelvinWaterRider-Android")
             .build()
 
         client.newCall(request).enqueue(object : Callback {
@@ -700,81 +699,86 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             override fun onResponse(call: Call, response: Response) {
-                response.use { res ->
-                    if (res.isSuccessful) {
-                        try {
-                            val body = res.body?.string() ?: ""
-                            val json = JSONObject(body)
-                            val tagName = json.optString("tag_name", "v1.0")
-                            val cleanTag = tagName.removePrefix("v").trim()
-                            val currentVersion = BuildConfig.VERSION_NAME.removePrefix("v").trim()
+                if (response.isSuccessful) {
+                    try {
+                        val body = response.body?.string() ?: ""
+                        val json = JSONObject(body)
+                        val tagName = json.optString("tag_name", "v1.0")
+                        val cleanTag = tagName.removePrefix("v").trim()
+                        val currentVersion = BuildConfig.VERSION_NAME.trim()
 
-                            val assets = json.optJSONArray("assets")
-                            var downloadUrl = ""
-                            if (assets != null && assets.length() > 0) {
-                                for (i in 0 until assets.length()) {
-                                    val asset = assets.getJSONObject(i)
-                                    val url = asset.optString("browser_download_url", "")
-                                    if (url.endsWith(".apk", ignoreCase = true)) {
-                                        downloadUrl = url
-                                        break
-                                    }
-                                }
-                                if (downloadUrl.isEmpty()) {
-                                    downloadUrl = assets.getJSONObject(0).optString("browser_download_url", "")
+                        val assets = json.optJSONArray("assets")
+                        var downloadUrl = ""
+                        if (assets != null && assets.length() > 0) {
+                            for (i in 0 until assets.length()) {
+                                val asset = assets.getJSONObject(i)
+                                val url = asset.optString("browser_download_url", "")
+                                if (url.endsWith(".apk", ignoreCase = true)) {
+                                    downloadUrl = url
+                                    break
                                 }
                             }
-
                             if (downloadUrl.isEmpty()) {
-                                _updateDownloadUrl.value = null
-                                _updateStatus.value = "Release $tagName found, but no .apk asset attached."
-                            } else {
-                                _updateDownloadUrl.value = downloadUrl
-                                if (cleanTag != currentVersion) {
-                                    _updateStatus.value = "New release $tagName available! (Current: v$currentVersion)"
-                                } else {
-                                    _updateStatus.value = "Latest release: $tagName (You are on current version v$currentVersion)"
-                                }
+                                downloadUrl = assets.getJSONObject(0).optString("browser_download_url", "")
                             }
-                        } catch (e: Exception) {
-                            _updateStatus.value = "Error parsing release info: ${e.localizedMessage}"
                         }
-                    } else {
-                        _updateStatus.value = "No published GitHub releases found yet (HTTP ${res.code})."
+
+                        if (downloadUrl.isEmpty()) {
+                            _updateDownloadUrl.value = null
+                            _updateStatus.value = "Release $tagName found, but no .apk asset attached in release assets."
+                        } else {
+                            _updateDownloadUrl.value = downloadUrl
+                            if (isNewerRelease(tagName, currentVersion)) {
+                                _updateStatus.value = "New release $tagName available! (Current: $currentVersion)"
+                            } else {
+                                _updateStatus.value = "Latest release: $tagName (You are on current version $currentVersion)"
+                            }
+                        }
+                    } catch (e: Exception) {
+                        _updateStatus.value = "Error parsing release info: ${e.localizedMessage}"
                     }
+                } else {
+                    _updateStatus.value = "No published GitHub releases found yet (HTTP ${response.code})."
                 }
             }
         })
     }
 
+    private fun isNewerRelease(remoteTag: String, currentVersion: String): Boolean {
+        val cleanRemote = remoteTag.removePrefix("v").trim()
+        val cleanLocal = currentVersion.removePrefix("v").trim()
+        if (cleanRemote == cleanLocal) return false
+
+        val remoteParts = cleanRemote.split(".").mapNotNull { it.toIntOrNull() }
+        val localParts = cleanLocal.split(".").mapNotNull { it.toIntOrNull() }
+
+        val maxLen = maxOf(remoteParts.size, localParts.size)
+        for (i in 0 until maxLen) {
+            val r = remoteParts.getOrElse(i) { 0 }
+            val l = localParts.getOrElse(i) { 0 }
+            if (r > l) return true
+            if (r < l) return false
+        }
+        return cleanRemote != cleanLocal
+    }
+
     fun downloadAndInstallUpdate(context: Context, downloadUrl: String) {
         try {
             val appContext = context.applicationContext
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                 val pm = appContext.packageManager
                 if (!pm.canRequestPackageInstalls()) {
-                    val intent = Intent(
-                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        Uri.parse("package:${appContext.packageName}")
-                    ).apply {
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
+                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${appContext.packageName}"))
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     appContext.startActivity(intent)
-                    Toast.makeText(
-                        appContext,
-                        "I-allow muna ang 'Install unknown apps' para sa Melvin WaterRider.",
-                        Toast.LENGTH_LONG
-                    ).show()
+                    Toast.makeText(appContext, "Please allow 'Install unknown apps' permission to update.", Toast.LENGTH_LONG).show()
                     _updateStatus.value = "Grant 'Install unknown apps' permission in Settings."
                     return
                 }
             }
 
-            val downloadDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-            if (downloadDir != null && !downloadDir.exists()) {
-                downloadDir.mkdirs()
-            }
-            val file = File(downloadDir, "MelvinWaterRider_latest.apk")
+            val destDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            val file = File(destDir, "MelvinWaterRider_latest.apk")
             if (file.exists()) {
                 file.delete()
             }
@@ -784,35 +788,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 .setDescription("Downloading latest APK...")
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationInExternalFilesDir(appContext, Environment.DIRECTORY_DOWNLOADS, "MelvinWaterRider_latest.apk")
-                .setMimeType("application/vnd.android.package-archive")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(true)
 
             val dm = appContext.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
             val downloadId = dm.enqueue(request)
 
-            _updateStatus.value = "Downloading update..."
-            Toast.makeText(appContext, "Downloading update...", Toast.LENGTH_SHORT).show()
-
             val receiver = object : BroadcastReceiver() {
-                override fun onReceive(ctx: Context, intent: Intent) {
-                    val id = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L)
+                override fun onReceive(recvContext: Context?, intent: Intent?) {
+                    val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1L) ?: -1L
                     if (id == downloadId) {
                         try {
                             appContext.unregisterReceiver(this)
-                        } catch (_: Exception) {
-                        }
+                        } catch (_: Exception) {}
                         installDownloadedApk(appContext)
                     }
                 }
             }
-
             ContextCompat.registerReceiver(
                 appContext,
                 receiver,
                 IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
                 ContextCompat.RECEIVER_EXPORTED
             )
+
+            _updateStatus.value = "Downloading update to app downloads directory..."
+            Toast.makeText(appContext, "Downloading update...", Toast.LENGTH_LONG).show()
         } catch (e: Exception) {
             _updateStatus.value = "Download failed: ${e.localizedMessage}"
             Toast.makeText(context, "Download failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
@@ -822,12 +823,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun installDownloadedApk(context: Context) {
         try {
             val appContext = context.applicationContext
-            val file = File(
-                appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-                "MelvinWaterRider_latest.apk"
-            )
-            if (!file.exists() || file.length() == 0L) {
-                Toast.makeText(appContext, "Downloaded APK not found.", Toast.LENGTH_SHORT).show()
+            val destDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+            val file = File(destDir, "MelvinWaterRider_latest.apk")
+            if (!file.exists()) {
+                Toast.makeText(appContext, "Downloaded APK not found in Downloads folder.", Toast.LENGTH_SHORT).show()
                 _updateStatus.value = "Downloaded APK file not found."
                 return
             }
